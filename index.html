@@ -515,7 +515,7 @@
                 const currentFoods = [...this.state.tables.left, ...this.state.tables.right].map(a => a.food);
                 this.state.feverFood = this.getRandom(currentFoods);
 
-                this.state.foodQueue = this.state.foodQueue.slice(0, 2); // 현재 보임되는 것만 남김
+                this.state.foodQueue = this.state.foodQueue.slice(0, 4); // 현재 보임되는 것만 남김
                 this.el.container.classList.add('fever-mode');
                 this.showFloatingText("🔥 FEVER TIME! 🔥", "orange");
             }
