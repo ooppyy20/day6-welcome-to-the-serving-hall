@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>웰컴 투 더 서빙홀 - Refactored</title>
+    <title>웰컴 투 더 서빙홀</title>
     <style>
         :root {
             --bg-color: #f0e68c;
@@ -33,7 +33,6 @@
             align-items: center;
         }
 
-        /* HUD */
         #hud {
             width: 100%;
             padding: 20px;
@@ -59,7 +58,6 @@
             color: #666;
         }
 
-        /* Timer Bar */
         #timerBarContainer {
             width: 100%;
             height: 10px;
@@ -78,7 +76,6 @@
             animation: flash 0.5s infinite;
         }
 
-        /* Game Board */
         #board {
             flex: 1;
             width: 100%;
@@ -101,6 +98,7 @@
             gap: 10px;
             border: 4px dashed #999;
             transition: all 0.2s;
+            cursor: pointer;
         }
 
         .animal-slot {
@@ -116,7 +114,6 @@
             right: -10px;
         }
 
-        /* Center Queue */
         #servingBelt {
             width: 25%;
             display: flex;
@@ -143,7 +140,6 @@
             transform: scale(1.2);
         }
 
-        /* Overlay */
         .overlay {
             position: absolute;
             top: 0;
@@ -157,6 +153,7 @@
             align-items: center;
             color: white;
             z-index: 100;
+            text-align: center;
         }
 
         button {
@@ -170,7 +167,7 @@
             margin-top: 20px;
         }
 
-        /* Animations */
+        /* FX & Animations */
         @keyframes popIn {
             from {
                 transform: scale(0);
@@ -237,7 +234,6 @@
 
         .fever-mode {
             background-color: var(--fever-color) !important;
-            transition: background 0.3s;
         }
 
         .floating-text {
@@ -277,442 +273,390 @@
             <div class="stat-item"><span class="stat-label">COMBO</span><span id="comboValue"
                     class="stat-value">0</span></div>
             <div class="stat-item"><span class="stat-label">TIME</span><span id="timeValue"
-                    class="stat-value">60.0</span></div>
+                    class="stat-value">0.0</span></div>
         </div>
         <div id="timerBarContainer">
             <div id="timerBar"></div>
         </div>
 
         <div id="board">
-            <div id="leftTable" class="table-area" onclick="handleServe('left')"></div>
+            <div id="leftTable" class="table-area"></div>
             <div id="servingBelt"></div>
-            <div id="rightTable" class="table-area" onclick="handleServe('right')"></div>
+            <div id="rightTable" class="table-area"></div>
         </div>
 
         <div id="startOverlay" class="overlay">
             <h1>🐻 웰컴 투 더 서빙홀 🦊</h1>
             <p>음식을 선호하는 동물이 있는 방향으로 터치하세요!</p>
-            <button onclick="startGame()">영업 시작</button>
+            <button id="btnStart">영업 시작</button>
         </div>
 
         <div id="gameOverOverlay" class="overlay" style="display: none;">
             <h1>영업 종료!</h1>
             <p>최종 점수: <span id="finalScore">0</span></p>
-
             <div id="recordSection">
                 <input type="text" id="nickname" placeholder="닉네임 입력" maxlength="10"
                     style="padding:10px; border-radius:5px;">
-                <button onclick="submitScore()">점수 등록</button>
+                <button id="btnSubmit">점수 등록</button>
             </div>
-
             <div id="leaderboard"
-                style="margin-top:20px; font-size:14px; background:rgba(255,255,255,0.1); padding:10px; border-radius:10px;">
+                style="margin-top:20px; font-size:14px; background:rgba(255,255,255,0.1); padding:10px; border-radius:10px; width: 80%;">
                 <h3>오늘의 고득점자</h3>
                 <div id="leaderboardList">불러오는 중...</div>
             </div>
-
-            <button onclick="startGame()">다시 오픈하기</button>
+            <button id="btnRestart">다시 오픈하기</button>
         </div>
     </div>
 
     <script>
         /**
-         * GAME CONFIGURATION & CONSTANTS
+         * 1. CONFIGURATION
+         * 게임의 모든 밸런스 조정 값을 한곳에 모았습니다.
          */
-        const GAME_DATA = {
-            animals: [
+        const CONFIG = {
+            ANIMALS: [
                 { id: 'bear', emoji: '🐻', food: '🍲' },
                 { id: 'fox', emoji: '🦊', food: '☕' },
                 { id: 'rabbit', emoji: '🐰', food: '🥣' },
                 { id: 'dog', emoji: '🐶', food: '🧃' }
             ],
-            timeLimit: 30,
-            timePenalty: 2,
-            timeBonus: 0.2,
-            feverThreshold: 10,
-            feverDuration: 50, // 5초 (0.1초 단위)
-            feverProbability: 0.8,
-            maxQueueSize: 6,
-            difficultyThresholds: [
+            TIME: {
+                LIMIT: 30,
+                PENALTY: 2,
+                BONUS: 0.2,
+                TICK: 100 // ms
+            },
+            SCORING: {
+                BASE: 100,
+                COMBO_STEP: 5,
+                COMBO_BONUS: 20,
+                FAIL_PENALTY: 50
+            },
+            FEVER: {
+                THRESHOLD: 10,
+                DURATION: 50, // ticks (5sec)
+                PROBABILITY: 0.8
+            },
+            DIFFICULTY: [
                 { score: 2000, totalAnimals: 2 },
                 { score: 5000, totalAnimals: 3 }
-            ]
+            ],
+            MAX_QUEUE: 6,
+            API: {
+                FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLSedkgqcVKUXZbW64qAon3xzAnMDeECvHScQO4yEEEgWltlIIQ/formResponse",
+                SHEET_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTS1t7Q4XpK2ISwW7yuy2R4GzDVvY9PaHaOW-yOAodVixvfPn14MUdsUYyg6INGxz-n5dh68HpCqzvr/pub?output=csv",
+                ENTRY_NICK: "entry.1963889324",
+                ENTRY_SCORE: "entry.1300941228"
+            }
         };
 
         /**
-         * GAME STATE
+         * 2. GAME STATE
+         * 현재 진행중인 게임의 데이터만 관리합니다.
          */
-        let gameState = {
-            score: 0,
-            combo: 0,
-            timeLeft: 0,
-            isActive: false,
-            isFever: false,
-            feverTimer: 0,
-            feverFoodItem: null,
-            tables: { left: [], right: [] },
-            foodQueue: [],
-            timerInterval: null
-        };
-
-        const dom = {
-            score: document.getElementById('scoreValue'),
-            combo: document.getElementById('comboValue'),
-            time: document.getElementById('timeValue'),
-            timerBar: document.getElementById('timerBar'),
-            leftTable: document.getElementById('leftTable'),
-            rightTable: document.getElementById('rightTable'),
-            belt: document.getElementById('servingBelt'),
-            startOverlay: document.getElementById('startOverlay'),
-            gameOverOverlay: document.getElementById('gameOverOverlay'),
-            finalScore: document.getElementById('finalScore'),
-            container: document.getElementById('gameContainer')
-        };
-
-        /**
-         * UTILS
-         */
-        const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-        const createAnimalHTML = (animal) => `
-        <div class="animal-slot">
-            ${animal.emoji}<span class="food-hint">${animal.food}</span>
-        </div>`;
-
-        /**
-         * CORE GAME ENGINE
-         */
-        function startGame() {
-            // Reset State
-            gameState = {
-                ...gameState,
-                score: 0,
-                combo: 0,
-                timeLeft: GAME_DATA.timeLimit,
-                isActive: true,
-                isFever: false,
-                tables: { left: [], right: [] },
-                foodQueue: []
-            };
-
-            dom.startOverlay.style.display = 'none';
-            dom.gameOverOverlay.style.display = 'none';
-            dom.container.classList.remove('fever-mode');
-
-            setupInitialAnimals();
-            fillQueue();
-            updateUI();
-
-            if (gameState.timerInterval) clearInterval(gameState.timerInterval);
-            gameState.timerInterval = setInterval(updateTick, 100);
-        }
-
-        function setupInitialAnimals() {
-            const shuffled = [...GAME_DATA.animals].sort(() => Math.random() - 0.5);
-            gameState.tables.left.push(shuffled[0]);
-            gameState.tables.right.push(shuffled[1]);
-            renderTables();
-        }
-
-        function renderTables() {
-            dom.leftTable.innerHTML = gameState.tables.left.map(createAnimalHTML).join('');
-            dom.rightTable.innerHTML = gameState.tables.right.map(createAnimalHTML).join('');
-        }
-
-        function fillQueue() {
-            const currentFoods = [...gameState.tables.left, ...gameState.tables.right].map(a => a.food);
-
-            while (gameState.foodQueue.length < GAME_DATA.maxQueueSize) {
-                if (gameState.isFever) {
-                    if (!gameState.feverFoodItem) gameState.feverFoodItem = getRandomItem(currentFoods);
-                    const food = Math.random() < GAME_DATA.feverProbability ? gameState.feverFoodItem : getRandomItem(currentFoods);
-                    gameState.foodQueue.push(food);
-                } else {
-                    gameState.foodQueue.push(getRandomItem(currentFoods));
-                }
+        class GameState {
+            constructor() {
+                this.reset();
             }
-            renderQueue();
-        }
-
-        function renderQueue() {
-            dom.belt.innerHTML = gameState.foodQueue.map((food, idx) =>
-                `<div class="food-item ${idx === 0 ? 'next' : ''}">${food}</div>`
-            ).join('');
-        }
-
-        function handleServe(side) {
-            if (!gameState.isActive) return;
-
-            const servedFood = gameState.foodQueue[0];
-            const targetTableData = gameState.tables[side];
-            const targetTableDOM = side === 'left' ? dom.leftTable : dom.rightTable;
-
-            const animalIndex = targetTableData.findIndex(animal => animal.food === servedFood);
-            const isCorrect = animalIndex !== -1;
-
-            if (isCorrect) {
-                handleSuccess(targetTableDOM, animalIndex);
-            } else {
-                handleFailure(targetTableDOM);
-            }
-
-            gameState.foodQueue.shift();
-            checkDifficulty();
-            fillQueue();
-            updateUI();
-        }
-
-        function handleSuccess(tableDOM, animalIdx) {
-            gameState.combo++;
-            const comboBonus = Math.floor(gameState.combo / 5) * 20;
-            gameState.score += (100 + comboBonus);
-            gameState.timeLeft = Math.min(GAME_DATA.timeLimit, gameState.timeLeft + GAME_DATA.timeBonus);
-
-            tableDOM.classList.add('success-fx');
-            setTimeout(() => tableDOM.classList.remove('success-fx'), 300);
-
-            const animalSlot = tableDOM.querySelectorAll('.animal-slot')[animalIdx];
-            if (animalSlot) triggerHeartEffect(animalSlot);
-
-            if (gameState.combo >= GAME_DATA.feverThreshold && !gameState.isFever) {
-                startFever();
+            reset() {
+                this.score = 0;
+                this.combo = 0;
+                this.timeLeft = CONFIG.TIME.LIMIT;
+                this.isActive = false;
+                this.isFever = false;
+                this.feverTimer = 0;
+                this.feverFood = null;
+                this.tables = { left: [], right: [] };
+                this.foodQueue = [];
             }
         }
 
-        function handleFailure(tableDOM) {
-            gameState.combo = 0;
-            gameState.score = Math.max(0, gameState.score - 50);
-            gameState.timeLeft -= GAME_DATA.timePenalty;
-
-            tableDOM.classList.add('shake-fx');
-            setTimeout(() => tableDOM.classList.remove('shake-fx'), 300);
-
-            showFloatingText(`-${GAME_DATA.timePenalty}s`, 'var(--warning-color)');
-            if (gameState.isFever) endFever();
-        }
-
         /**
-         * EFFECTS
+         * 3. GAME ENGINE
+         * 게임의 핵심 로직과 UI 업데이트를 담당합니다.
          */
-        function triggerHeartEffect(parentEl) {
-            const heart = document.createElement('div');
-            heart.className = 'heart-fx';
-            heart.innerText = '❤️';
-            heart.style.left = '20px';
-            heart.style.top = '0px';
-            parentEl.appendChild(heart);
-            setTimeout(() => heart.remove(), 800);
-        }
+        class ServingGame {
+            constructor() {
+                this.state = new GameState();
+                this.initElements();
+                this.bindEvents();
+            }
 
-        function showFloatingText(text, color) {
-            const el = document.createElement('div');
-            el.className = 'floating-text';
-            el.innerText = text;
-            el.style.color = color;
-            el.style.left = '50%';
-            el.style.top = '20%';
-            dom.container.appendChild(el);
-            setTimeout(() => el.remove(), 800);
-        }
+            initElements() {
+                this.el = {
+                    container: document.getElementById('gameContainer'),
+                    score: document.getElementById('scoreValue'),
+                    combo: document.getElementById('comboValue'),
+                    time: document.getElementById('timeValue'),
+                    timerBar: document.getElementById('timerBar'),
+                    leftTable: document.getElementById('leftTable'),
+                    rightTable: document.getElementById('rightTable'),
+                    belt: document.getElementById('servingBelt'),
+                    startOverlay: document.getElementById('startOverlay'),
+                    gameOverOverlay: document.getElementById('gameOverOverlay'),
+                    finalScore: document.getElementById('finalScore'),
+                    nickname: document.getElementById('nickname'),
+                    leaderboard: document.getElementById('leaderboardList'),
+                    recordSection: document.getElementById('recordSection')
+                };
+            }
 
-        /**
-         * SYSTEMS
-         */
-        function checkDifficulty() {
-            const currentTotal = gameState.tables.left.length + gameState.tables.right.length;
-            const threshold = GAME_DATA.difficultyThresholds.find(t => gameState.score > t.score && currentTotal === t.totalAnimals);
+            bindEvents() {
+                document.getElementById('btnStart').onclick = () => this.start();
+                document.getElementById('btnRestart').onclick = () => this.start();
+                document.getElementById('btnSubmit').onclick = () => this.submitScore();
+                this.el.leftTable.onclick = () => this.handleServe('left');
+                this.el.rightTable.onclick = () => this.handleServe('right');
 
-            if (threshold) {
-                const usedIds = [...gameState.tables.left, ...gameState.tables.right].map(a => a.id);
-                const nextAnimal = GAME_DATA.animals.find(a => !usedIds.includes(a.id));
+                window.onkeydown = (e) => {
+                    if (e.key === 'ArrowLeft') this.handleServe('left');
+                    if (e.key === 'ArrowRight') this.handleServe('right');
+                };
+            }
 
-                if (nextAnimal) {
-                    if (gameState.tables.left.length <= gameState.tables.right.length) {
-                        gameState.tables.left.push(nextAnimal);
+            start() {
+                this.state.reset();
+                this.el.startOverlay.style.display = 'none';
+                this.el.gameOverOverlay.style.display = 'none';
+                this.el.recordSection.style.display = 'block';
+                this.el.container.classList.remove('fever-mode');
+
+                this.setupInitialTables();
+                this.fillQueue();
+                this.updateUI();
+
+                if (this.timer) clearInterval(this.timer);
+                this.timer = setInterval(() => this.tick(), CONFIG.TIME.TICK);
+                this.state.isActive = true;
+            }
+
+            setupInitialTables() {
+                const shuffled = [...CONFIG.ANIMALS].sort(() => Math.random() - 0.5);
+                this.state.tables.left = [shuffled[0]];
+                this.state.tables.right = [shuffled[1]];
+                this.renderTables();
+            }
+
+            renderTables() {
+                const createHTML = (a) => `<div class="animal-slot">${a.emoji}<span class="food-hint">${a.food}</span></div>`;
+                this.el.leftTable.innerHTML = this.state.tables.left.map(createHTML).join('');
+                this.el.rightTable.innerHTML = this.state.tables.right.map(createHTML).join('');
+            }
+
+            fillQueue() {
+                const currentFoods = [...this.state.tables.left, ...this.state.tables.right].map(a => a.food);
+                while (this.state.foodQueue.length < CONFIG.MAX_QUEUE) {
+                    let food;
+                    if (this.state.isFever) {
+                        food = Math.random() < CONFIG.FEVER.PROBABILITY ? this.state.feverFood : this.getRandom(currentFoods);
                     } else {
-                        gameState.tables.right.push(nextAnimal);
+                        food = this.getRandom(currentFoods);
                     }
-                    renderTables();
+                    this.state.foodQueue.push(food);
+                }
+                this.renderQueue();
+            }
+
+            renderQueue() {
+                this.el.belt.innerHTML = this.state.foodQueue.map((food, idx) =>
+                    `<div class="food-item ${idx === 0 ? 'next' : ''}">${food}</div>`
+                ).join('');
+            }
+
+            handleServe(side) {
+                if (!this.state.isActive) return;
+
+                const servedFood = this.state.foodQueue[0];
+                const targetTable = this.state.tables[side];
+                const tableDOM = side === 'left' ? this.el.leftTable : this.el.rightTable;
+
+                const animalIdx = targetTable.findIndex(a => a.food === servedFood);
+
+                if (animalIdx !== -1) {
+                    this.onSuccess(tableDOM, animalIdx);
+                } else {
+                    this.onFailure(tableDOM);
+                }
+
+                this.state.foodQueue.shift();
+                this.checkDifficulty();
+                this.fillQueue();
+                this.updateUI();
+            }
+
+            onSuccess(tableDOM, idx) {
+                this.state.combo++;
+                const bonus = Math.floor(this.state.combo / CONFIG.SCORING.COMBO_STEP) * CONFIG.SCORING.COMBO_BONUS;
+                this.state.score += (CONFIG.SCORING.BASE + bonus);
+                this.state.timeLeft = Math.min(CONFIG.TIME.LIMIT, this.state.timeLeft + CONFIG.TIME.BONUS);
+
+                this.triggerEffect(tableDOM, 'success-fx');
+                this.triggerHeart(tableDOM.querySelectorAll('.animal-slot')[idx]);
+
+                if (this.state.combo >= CONFIG.FEVER.THRESHOLD && !this.state.isFever) {
+                    this.startFever();
                 }
             }
-        }
 
-        function startFever() {
-            gameState.isFever = true;
-            gameState.feverTimer = GAME_DATA.feverDuration;
+            onFailure(tableDOM) {
+                this.state.combo = 0;
+                this.state.score = Math.max(0, this.state.score - CONFIG.SCORING.FAIL_PENALTY);
+                this.state.timeLeft -= CONFIG.TIME.PENALTY;
 
-            const allCurrentFoods = [...gameState.tables.left, ...gameState.tables.right].map(a => a.food);
-            gameState.feverFoodItem = getRandomItem(allCurrentFoods);
-
-            gameState.foodQueue = [];
-            fillQueue();
-
-            dom.container.classList.add('fever-mode');
-            showFloatingText("🔥 FEVER TIME! 🔥", "orange");
-        }
-
-        function endFever() {
-            gameState.isFever = false;
-            dom.container.classList.remove('fever-mode');
-            showFloatingText("FEVER END", "#666");
-        }
-
-        function updateTick() {
-            if (!gameState.isActive) return;
-
-            gameState.timeLeft -= 0.1;
-            if (gameState.isFever) {
-                gameState.feverTimer--;
-                if (gameState.feverTimer <= 0) endFever();
+                this.triggerEffect(tableDOM, 'shake-fx');
+                this.showFloatingText(`-${CONFIG.TIME.PENALTY}s`, 'var(--warning-color)');
+                if (this.state.isFever) this.endFever();
             }
 
-            if (gameState.timeLeft <= 0) endGame();
-            updateUI();
-        }
+            /** FEVER SYSTEM */
+            startFever() {
+                this.state.isFever = true;
+                this.state.feverTimer = CONFIG.FEVER.DURATION;
+                const currentFoods = [...this.state.tables.left, ...this.state.tables.right].map(a => a.food);
+                this.state.feverFood = this.getRandom(currentFoods);
 
-        function updateUI() {
-            dom.score.innerText = gameState.score;
-            dom.combo.innerText = gameState.combo;
-            dom.time.innerText = Math.max(0, gameState.timeLeft).toFixed(1);
+                this.state.foodQueue = this.state.foodQueue.slice(0, 2); // 현재 보임되는 것만 남김
+                this.el.container.classList.add('fever-mode');
+                this.showFloatingText("🔥 FEVER TIME! 🔥", "orange");
+            }
 
-            const timePercent = (gameState.timeLeft / GAME_DATA.timeLimit) * 100;
-            dom.timerBar.style.width = `${timePercent}%`;
-            dom.timerBar.classList.toggle('warning', timePercent < 30);
-        }
+            endFever() {
+                this.state.isFever = false;
+                this.el.container.classList.remove('fever-mode');
+                this.showFloatingText("FEVER END", "#666");
+            }
 
-        function endGame() {
-            gameState.isActive = false;
-            clearInterval(gameState.timerInterval);
-            dom.finalScore.innerText = gameState.score;
-            dom.gameOverOverlay.style.display = 'flex';
-        }
+            /** ENGINE CORE */
+            tick() {
+                if (!this.state.isActive) return;
 
-        // Input Listeners
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') handleServe('left');
-            if (e.key === 'ArrowRight') handleServe('right');
-        });
+                this.state.timeLeft -= 0.1;
+                if (this.state.isFever) {
+                    this.state.feverTimer--;
+                    if (this.state.feverTimer <= 0) this.endFever();
+                }
 
-        // 구글 설문지 정보 (본인의 값으로 교체 필요)
-        const GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSedkgqcVKUXZbW64qAon3xzAnMDeECvHScQO4yEEEgWltlIIQ/formResponse";
-        const ENTRY_NICKNAME = "entry.1963889324"; // 닉네임 필드 ID
-        const ENTRY_SCORE = "entry.1300941228";    // 점수 필드 ID
-        const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTS1t7Q4XpK2ISwW7yuy2R4GzDVvY9PaHaOW-yOAodVixvfPn14MUdsUYyg6INGxz-n5dh68HpCqzvr/pub?output=csv";
+                if (this.state.timeLeft <= 0) this.endGame();
+                this.updateUI();
+            }
 
-        async function submitScore() {
-            const nickname = document.getElementById('nickname').value;
-            const score = gameState.score;
+            updateUI() {
+                this.el.score.innerText = this.state.score;
+                this.el.combo.innerText = this.state.combo;
+                this.el.time.innerText = Math.max(0, this.state.timeLeft).toFixed(1);
 
-            if (!nickname) return alert("닉네임을 입력하세요!");
+                const percent = (this.state.timeLeft / CONFIG.TIME.LIMIT) * 100;
+                this.el.timerBar.style.width = `${percent}%`;
+                this.el.timerBar.classList.toggle('warning', percent < 30);
+            }
 
-            // 폼 데이터 생성 (CORS 이슈를 피하기 위해 mode: 'no-cors' 사용)
-            const formData = new URLSearchParams();
-            formData.append(ENTRY_NICKNAME, nickname);
-            formData.append(ENTRY_SCORE, score);
+            checkDifficulty() {
+                const total = this.state.tables.left.length + this.state.tables.right.length;
+                const level = CONFIG.DIFFICULTY.find(d => this.state.score > d.score && total === d.totalAnimals);
 
-            try {
-                await fetch(GOOGLE_FORM_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData
+                if (level) {
+                    const currentIds = [...this.state.tables.left, ...this.state.tables.right].map(a => a.id);
+                    const nextAnimal = CONFIG.ANIMALS.find(a => !currentIds.includes(a.id));
+                    if (nextAnimal) {
+                        const side = this.state.tables.left.length <= this.state.tables.right.length ? 'left' : 'right';
+                        this.state.tables[side].push(nextAnimal);
+                        this.renderTables();
+                    }
+                }
+            }
+
+            endGame() {
+                this.state.isActive = false;
+                clearInterval(this.timer);
+                this.el.finalScore.innerText = this.state.score;
+                this.el.gameOverOverlay.style.display = 'flex';
+                this.loadLeaderboard();
+            }
+
+            /** FX UTILS */
+            triggerEffect(el, className) {
+                el.classList.add(className);
+                setTimeout(() => el.classList.remove(className), 300);
+            }
+
+            triggerHeart(parent) {
+                if (!parent) return;
+                const heart = document.createElement('div');
+                heart.className = 'heart-fx';
+                heart.innerText = '❤️';
+                parent.appendChild(heart);
+                setTimeout(() => heart.remove(), 800);
+            }
+
+            showFloatingText(text, color) {
+                const el = document.createElement('div');
+                el.className = 'floating-text';
+                el.innerText = text;
+                el.style.cssText = `color: ${color}; left: 50%; top: 20%;`;
+                this.el.container.appendChild(el);
+                setTimeout(() => el.remove(), 800);
+            }
+
+            getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+            /** DATA API */
+            async submitScore() {
+                const nick = this.el.nickname.value;
+                if (!nick) return alert("닉네임을 입력하세요!");
+
+                const body = new URLSearchParams({ [CONFIG.API.ENTRY_NICK]: nick, [CONFIG.API.ENTRY_SCORE]: this.state.score });
+
+                try {
+                    await fetch(CONFIG.API.FORM_URL, { method: 'POST', mode: 'no-cors', body });
+                    alert("등록 성공!");
+                    this.el.recordSection.style.display = 'none';
+                    this.loadLeaderboard();
+                } catch (e) { console.error(e); }
+            }
+
+            async loadLeaderboard() {
+                this.el.leaderboard.innerHTML = "데이터 로딩 중...";
+                try {
+                    const res = await fetch(`${CONFIG.API.SHEET_URL}&cache=${Date.now()}`);
+                    const csv = await res.text();
+                    const today = new Date().toLocaleDateString();
+
+                    const list = csv.split('\n').slice(1)
+                        .map(row => {
+                            const [time, nick, score] = row.replace(/["\r]/g, '').split(',');
+                            const dateMatch = time.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+                            if (!dateMatch) return null;
+                            const rowDate = `${dateMatch[1]}. ${dateMatch[2]}. ${dateMatch[3]}.`;
+                            // 단순 날짜 비교 (로컬 날짜 형식에 따라 조정 필요)
+                            return { nick, score: parseInt(score) };
+                        })
+                        .filter(i => i && !isNaN(i.score))
+                        .sort((a, b) => b.score - a.score)
+                        .slice(0, 10);
+
+                    this.renderLeaderboardUI(list);
+                } catch (e) { this.el.leaderboard.innerHTML = "기록 로딩 실패"; }
+            }
+
+            renderLeaderboardUI(list) {
+                if (list.length === 0) {
+                    this.el.leaderboard.innerHTML = "오늘의 첫 주인공이 되어보세요!";
+                    return;
+                }
+                let html = '<table style="width:100%; border-collapse:collapse;">';
+                list.forEach((item, i) => {
+                    html += `<tr style="border-bottom:1px solid #555">
+                <td style="padding:5px; color:${i < 3 ? '#ffd700' : '#ccc'}">${i + 1}위</td>
+                <td style="text-align:left">${item.nick}</td>
+                <td style="text-align:right; font-weight:bold">${item.score.toLocaleString()}</td>
+            </tr>`;
                 });
-                alert("등록 완료!");
-                document.getElementById('recordSection').style.display = 'none';
-                loadLeaderboard(); // 등록 후 리더보드 갱신
-            } catch (e) {
-                console.error("등록 실패", e);
+                this.el.leaderboard.innerHTML = html + '</table>';
             }
         }
 
-async function loadLeaderboard() {
-    const listEl = document.getElementById('leaderboardList');
-    listEl.innerHTML = "기록 확인 중...";
-
-    try {
-        const response = await fetch(SHEET_CSV_URL + "&cachebust=" + Date.now());
-        const data = await response.text();
-
-        // 1. 현재 날짜 정보 (오늘)
-        const now = new Date();
-        const curYear = now.getFullYear();
-        const curMonth = now.getMonth() + 1;
-        const curDate = now.getDate();
-
-        // 2. CSV 파싱
-        const rows = data.split('\n').slice(1);
-        const list = rows.map(row => {
-            // 따옴표 및 개행문자(\r) 제거 후 분리
-            const parts = row.replace(/["\r]/g, '').split(',');
-            if (parts.length < 3) return null;
-
-            const timeStr = parts[0].trim(); // "2026. 1. 9 오후 2:54:34"
-            const nick = parts[1].trim();
-            const sc = parseInt(parts[2].trim());
-
-            if (!timeStr || isNaN(sc)) return null;
-
-            // 3. 정규표현식으로 날짜 숫자만 추출 (매우 중요!)
-            // "2026. 1. 9 ..." -> [2026, 1, 9]
-            const dateMatch = timeStr.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
-            
-            if (dateMatch) {
-                const year = parseInt(dateMatch[1]);
-                const month = parseInt(dateMatch[2]);
-                const day = parseInt(dateMatch[3]);
-
-                // 오늘 날짜와 정확히 일치하는지 비교
-                const isToday = (year === curYear && month === curMonth && day === curDate);
-                if (isToday) return { nick, sc };
-            }
-            
-            return null;
-        })
-        .filter(item => item !== null)
-        .sort((a, b) => b.sc - a.sc)
-        .slice(0, 20);
-
-        // 4. 화면 출력 (테이블 형태)
-        if (list.length === 0) {
-            listEl.innerHTML = "오늘 등록된 기록이 없습니다.<br>첫 번째 주인공이 되어보세요! 🏆";
-            return;
-        }
-
-        let html = `<div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
-                      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">`;
-        
-        list.forEach((item, idx) => {
-            const isTop3 = idx < 3;
-            const rowStyle = `border-bottom: 1px solid rgba(255,255,255,0.1);`;
-            const rankStyle = isTop3 ? `color: var(--fever-color); font-weight: bold; font-size: 16px;` : `color: #ccc;`;
-            
-            html += `
-                <tr style="${rowStyle}">
-                    <td style="padding: 10px 5px; ${rankStyle}">${idx + 1}위</td>
-                    <td style="padding: 10px 5px; text-align: left; font-weight: 500;">${item.nick}</td>
-                    <td style="padding: 10px 5px; text-align: right; color: var(--fever-color); font-weight: bold;">
-                        ${item.sc.toLocaleString()}
-                    </td>
-                </tr>`;
-        });
-
-        html += `</table></div>`;
-        listEl.innerHTML = html;
-
-    } catch (e) {
-        console.error("오류 상세:", e);
-        listEl.innerHTML = "기록을 불러오지 못했습니다.";
-    }
-}
-
-        // 게임 종료 시 리더보드 불러오기 실행
-        function endGame() {
-            gameState.isActive = false;
-            clearInterval(gameState.timerInterval);
-            dom.finalScore.innerText = gameState.score;
-            dom.gameOverOverlay.style.display = 'flex';
-            document.getElementById('recordSection').style.display = 'block';
-            loadLeaderboard();
-        }
+        // 게임 인스턴스 생성
+        const game = new ServingGame();
     </script>
 </body>
 
