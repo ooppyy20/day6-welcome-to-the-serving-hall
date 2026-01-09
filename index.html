@@ -604,38 +604,45 @@
                 const nick = this.el.nickname.value;
                 if (!nick) return alert("닉네임을 입력하세요!");
 
+                // 버튼 비활성화
+                const btn = document.getElementById('btnSubmit');
+                btn.disabled = true;
+                btn.innerText = "등록 중...";
+
                 const body = new URLSearchParams({ [CONFIG.API.ENTRY_NICK]: nick, [CONFIG.API.ENTRY_SCORE]: this.state.score });
 
                 try {
                     await fetch(CONFIG.API.FORM_URL, { method: 'POST', mode: 'no-cors', body });
                     alert("등록 성공!");
                     this.el.recordSection.style.display = 'none';
-                    this.loadLeaderboard();
+                    this.loadLeaderboard(); // 이 메서드를 호출함
                 } catch (e) { console.error(e); }
             }
 
+            // 수정된 부분: function 키워드를 제거했습니다.
             async loadLeaderboard() {
                 this.el.leaderboard.innerHTML = "데이터 로딩 중...";
                 try {
-                    const res = await fetch(`${CONFIG.API.SHEET_URL}&cache=${Date.now()}`);
+                    const res = await fetch(`${CONFIG.API.SHEET_URL}&t=${Date.now()}`);
                     const csv = await res.text();
-                    const today = new Date().toLocaleDateString();
 
-                    const list = csv.split('\n').slice(1)
-                        .map(row => {
-                            const [time, nick, score] = row.replace(/["\r]/g, '').split(',');
-                            const dateMatch = time.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
-                            if (!dateMatch) return null;
-                            const rowDate = `${dateMatch[1]}. ${dateMatch[2]}. ${dateMatch[3]}.`;
-                            // 단순 날짜 비교 (로컬 날짜 형식에 따라 조정 필요)
-                            return { nick, score: parseInt(score) };
-                        })
-                        .filter(i => i && !isNaN(i.score))
+                    const rows = csv.split('\n').slice(1);
+                    const list = rows.map(row => {
+                        const columns = row.replace(/["\r]/g, '').split(',');
+                        if (columns.length < 3) return null;
+                        return {
+                            nick: columns[1],
+                            score: parseInt(columns[2])
+                        };
+                    })
+                        .filter(item => item && !isNaN(item.score))
                         .sort((a, b) => b.score - a.score)
                         .slice(0, 10);
 
                     this.renderLeaderboardUI(list);
-                } catch (e) { this.el.leaderboard.innerHTML = "기록 로딩 실패"; }
+                } catch (e) {
+                    this.el.leaderboard.innerHTML = "기록 로딩 실패";
+                }
             }
 
             renderLeaderboardUI(list) {
