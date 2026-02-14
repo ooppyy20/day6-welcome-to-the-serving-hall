@@ -176,7 +176,7 @@ function showOpening() {
     
     // 화면 클릭/터치로 게임 시작
     this.input.once('pointerdown', () => {
-        this.sound.play('button', {volume: 0.5});
+        this.sound.play('button', {volume: 0.3});
         openingImage.destroy();
         pressText.destroy();
         startGame.call(this);
@@ -203,7 +203,7 @@ function startGame() {
     setupInput.call(this);
     
     // BGM 재생
-    gameState.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
+    gameState.bgm = this.sound.add('bgm', { loop: true, volume: 0.3 });
     gameState.bgm.play();
     
     // 게임 타이머 시작
@@ -398,7 +398,7 @@ function sortFood(direction) {
     
     if(isCorrect) {
         // 정답
-        this.sound.play('good', {volume: 0.5});
+        this.sound.play('good', {volume: 0.3});
         gameState.score += gameState.isFever ? 100 : 50;
         gameState.combo++;
         gameState.feverCount++;
@@ -419,7 +419,7 @@ function sortFood(direction) {
         
     } else {
         // 오답
-        this.sound.play('bad', {volume: 0.5});
+        this.sound.play('bad', {volume: 0.3});
         gameState.combo = 0;
         gameState.feverCount = 0;
         gameState.timeLeft -= 5;
@@ -614,7 +614,7 @@ function endGame() {
     
     // BGM 정지
     gameState.bgm.stop();
-    this.sound.play('gameover', {volume: 0.5});
+    this.sound.play('gameover', {volume: 0.3});
 
     showEnding.call(this);
 }
