@@ -1,6 +1,14 @@
+// API 설정 (구글 폼 및 시트 URL을 여기에 입력하세요)
+const API_CONFIG = {
+    FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSedkgqcVKUXZbW64qAon3xzAnMDeECvHScQO4yEEEgWltlIIQ/formResponse', // 구글 폼 제출 URL
+    SHEET_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS1t7Q4XpK2ISwW7yuy2R4GzDVvY9PaHaOW-yOAodVixvfPn14MUdsUYyg6INGxz-n5dh68HpCqzvr/pub?output=csv', // 구글 시트 CSV 내보내기 URL
+    ENTRY_NICK: 'entry.1963889324', // 구글 폼의 닉네임 필드 entry ID
+    ENTRY_SCORE: 'entry.1300941228' // 구글 폼의 점수 필드 entry ID
+};
+
 // 게임 설정
 const config = {
-    type: Phaser.AUTO,
+    type: Phaser.CANVAS,
     parent: 'game-container',
     scale: {
         mode: Phaser.Scale.FIT,
@@ -14,7 +22,7 @@ const config = {
         create: create,
         update: update
     },
-    backgroundColor: '#000000'
+    backgroundColor: '#000000',
 };
 
 const game = new Phaser.Game(config);
@@ -33,7 +41,7 @@ let gameState = {
     showingEnding: false,
     
     // 캐릭터 정보
-    characters: ['dowoon', 'sungjin', 'wonpil', 'youngk'],
+    availableChars: ['dowoon', 'sungjin', 'wonpil', 'youngk'],
     leftCharacters: [],
     rightCharacters: [],
     
@@ -46,6 +54,8 @@ let gameState = {
     characterSprites: {},
     
     // UI 요소
+    fontColorDark: '#584847',
+    fontColorLight: '#FFFFE6',
     scoreText: null,
     comboText: null,
     timebar: null,
@@ -56,7 +66,11 @@ let gameState = {
     feverTimer: null,
 
     // 키보드 입력
-    cursors: null
+    cursors: null,
+    
+    // 리더보드 관련
+    leaderboardData: [],
+    isSubmittingScore: false
 };
 
 // 프리로드
@@ -64,17 +78,16 @@ function preload() {
     // 배경
     this.load.image('bg_normal', 'assets/UI/Background_normal.jfif');
     this.load.image('bg_fever', 'assets/UI/Background_fever.jfif');
+    this.load.image('opening_pic', 'assets/opening.jfif');
     
     // UI 요소
     this.load.image('tables_normal', 'assets/UI/Tables_normal.png');
     this.load.image('tables_fever', 'assets/UI/Tables_fever.png');
-    this.load.spritesheet('timebox', 'assets/UI/timebox.PNG', { frameWidth: 2997 / 3, frameHeight: 102 });
-    this.load.spritesheet('timebar', 'assets/UI/timebar.PNG', { frameWidth: 2892 / 3, frameHeight: 72 });
-    this.load.spritesheet('scorebox', 'assets/UI/scorebox.PNG', { frameWidth: 2160 / 3, frameHeight: 268 });
-    this.load.spritesheet('combobox', 'assets/UI/combobox.PNG', { frameWidth: 924 / 3, frameHeight: 408 });
+    this.load.image('ui', 'assets/UI/UI.PNG');
+    this.load.image('title', 'assets/UI/title.PNG');
+    this.load.image('timebar', 'assets/UI/timebar.PNG');
     this.load.image('fevergauge', 'assets/UI/fevergauge.PNG');
-    this.load.spritesheet('leftarrow', 'assets/UI/leftarrow.PNG', { frameWidth: 462 / 3, frameHeight: 222 });
-    this.load.spritesheet('bill', 'assets/UI/bill.PNG', { frameWidth: 2736 / 3, frameHeight: 1378 });
+    this.load.spritesheet('bill', 'assets/UI/Bill.PNG', { frameWidth: 2736 / 3, frameHeight: 1378 });
 
     // 캐릭터 스프라이트 로드
     const emotions = ['normal', 'happy', 'joy', 'sad'];
@@ -96,50 +109,11 @@ function preload() {
     this.load.audio('button', 'assets/Sounds/button.mp3');
     this.load.audio('bgm', 'assets/Sounds/Sun, Stay Asleep.mp3');
     this.load.audio('gameover', 'assets/Sounds/gameover.mp3');
-    
-    // 오프닝, 엔딩
-    this.load.image('opening_pic', 'assets/opening.jfif');
-    this.load.video('ending_mov', 'assets/ending.mp4');
 }
 
 // 생성
 function create() {
     // UI 애니메이션
-    this.anims.create({
-        key: 'timebox_default',
-        frames: this.anims.generateFrameNumbers('timebox', { start: 0, end: 2 }),
-        frameRate: 5,
-        repeat: -1
-    });
-
-    this.anims.create({
-        key: 'timebar_default',
-        frames: this.anims.generateFrameNumbers('timebar', { start: 0, end: 2 }),
-        frameRate: 5,
-        repeat: -1
-    });
-
-    this.anims.create({
-        key: 'scorebox_default',
-        frames: this.anims.generateFrameNumbers('scorebox', { start: 0, end: 2 }),
-        frameRate: 5,
-        repeat: -1
-    });
-
-    this.anims.create({
-        key: 'combobox_default',
-        frames: this.anims.generateFrameNumbers('combobox', { start: 0, end: 2 }),
-        frameRate: 5,
-        repeat: -1
-    });
-
-    this.anims.create({
-        key: 'leftarrow_default',
-        frames: this.anims.generateFrameNumbers('leftarrow', { start: 0, end: 2 }),
-        frameRate: 5,
-        repeat: -1
-    });
-
     this.anims.create({
         key: 'bill_default',
         frames: this.anims.generateFrameNumbers('bill', { start: 0, end: 2 }),
@@ -162,7 +136,7 @@ function create() {
                 repeat: -1
             });
 
-            emotion_idx += 1;
+            emotion_idx ++;
         });
     });
 
@@ -173,27 +147,36 @@ function create() {
 // 오프닝 표시
 function showOpening() {
     const openingImage = this.add.image(540, 960, 'opening_pic');
-    openingImage.setScale(Math.max(1080 / openingImage.width, 1920 / openingImage.height));
-    
+    const title = this.add.image(540, 500, 'title');
+
+    // 확대 효과
+    this.tweens.add({
+        targets: title,
+        scale: 1.05,
+        duration: 800,
+        yoyo: true,
+        repeat: -1
+    });
+   
     // "Press Anywhere" 텍스트
-    const pressText = this.add.text(540, 540, 'PRESS ANYWHERE', {
+    const pressText = this.add.text(540, 1550, 'PRESS ANYWHERE', {
         fontFamily: 'DNFBitBitv2',
-        fontSize: '72px',
-        fill: '#fff',
+        fontSize: '75px',
+        fill: gameState.fontColorLight,
     }).setOrigin(0.5);
     
     // 깜빡이는 효과
     this.tweens.add({
         targets: pressText,
         alpha: 0.3,
-        duration: 800,
+        duration: 400,
         yoyo: true,
         repeat: -1
     });
     
     // 화면 클릭/터치로 게임 시작
     this.input.once('pointerdown', () => {
-        this.sound.play('button');
+        this.sound.play('button', {volume: 0.5});
         openingImage.destroy();
         pressText.destroy();
         startGame.call(this);
@@ -208,7 +191,7 @@ function startGame() {
     gameState.background = this.add.image(540, 960, 'bg_normal');
     
     // 테이블
-    this.add.image(540, 960, 'tables_normal').setDepth(1);;
+    gameState.tables = this.add.image(540, 960, 'tables_normal').setDepth(1);
     
     // UI 설정
     setupUI.call(this);
@@ -225,7 +208,7 @@ function startGame() {
     
     // 게임 타이머 시작
     gameState.gameTimer = this.time.addEvent({
-        delay: 1000,
+        delay: 10,
         callback: updateTimer,
         callbackScope: this,
         loop: true
@@ -234,31 +217,24 @@ function startGame() {
 
 // UI 설정
 function setupUI() {
-    // 점수판
-    const scorebox = this.add.sprite(370, 300, 'scorebox').play('scorebox_default');
-    gameState.scoreText = this.add.text(650, 300, '0', {
+    // UI 표시
+    const ui = this.add.image(540, 960, 'ui').setDepth(2);
+    
+    // 동적 요소 표시
+    gameState.timebar = this.add.image(539, 1785, 'timebar').setDepth(2);
+    gameState.fevergauge = this.add.image(907, 500, 'fevergauge').setCrop(0, 0, 0, 57).setDepth(2); // 226 x 57
+
+    gameState.scoreText = this.add.text(660, 450, '0', {
         fontFamily: 'DNFBitBitv2',
         fontSize: '100px',
-        fill: '#fff',
-    }).setOrigin(1, 0.5);
-    
-    // 시간 표시
-    const timebox = this.add.sprite(540, 100, 'timebox').play('timebox_default');
-    gameState.timebar = this.add.sprite(540, 100, 'timebar').play('timebar_default');
-    
-    // 콤보 & 피버
-    const combobox = this.add.sprite(890, 370, 'combobox').play('combobox_default');
-    gameState.comboText = this.add.text(925, 410, '0', {
+        fill: gameState.fontColorDark,
+    }).setOrigin(1, 0.5).setDepth(2);
+
+    gameState.comboText = this.add.text(905, 410, '0', {
         fontFamily: 'DNFBitBitv2',
         fontSize: '100px',
-        fill: '#fff',
-    }).setOrigin(1, 0.5);
-
-    gameState.fevergauge = this.add.image(890, 370, 'fevergauge').setCrop(0, 408, 924 / 3, 408);
-
-    // 가이드 화살표
-    const leftarrow = this.add.sprite(300, 1600, 'leftarrow').play('leftarrow_default');
-    const rightarrow = this.add.sprite(780, 1600, 'leftarrow').setScale(-1, 1).play('leftarrow_default');
+        fill: gameState.fontColorDark,
+    }).setOrigin(0.5, 0.5).setDepth(2);
 }
 
 // 게임 초기화
@@ -271,44 +247,53 @@ function initializeGame() {
 }
 
 // 캐릭터 배치
-function placeCharacters() {
-    // 기존 캐릭터 제거
-    Object.values(gameState.characterSprites).forEach(sprite => {
-        if(sprite) sprite.destroy();
-    });
-    
-    gameState.leftCharacters = [];
-    gameState.rightCharacters = [];
-    gameState.characterSprites = {};
-    
+function placeCharacters() {    
     // 난이도에 따라 캐릭터 수 결정
     const charsPerSide = gameState.difficulty;
-    const availableChars = [...gameState.characters];
     
-    // 왼쪽 캐릭터
-    for(let i = 0; i < charsPerSide; i++) {
-        const randomIndex = Phaser.Math.Between(0, availableChars.length - 1);
-        const char = availableChars.splice(randomIndex, 1)[0];
-        gameState.leftCharacters.push(char);
-        
-        const xPos = charsPerSide === 1 ? 200 : 100 + i * 180;
-        const sprite = this.add.sprite(xPos, 1080, `${char}`).play(`${char}_normal`);
-        sprite.setScale(1.5);
-        gameState.characterSprites[`left_${i}`] = sprite;
+    // 난이도 2일 때 기존 캐릭터 위치 조정
+    if(charsPerSide === 2) {
+        // 기존 왼쪽 캐릭터 이동
+        if(gameState.characterSprites['left_0']) {
+            gameState.characterSprites['left_0'].x = 100;
+        }
+        // 기존 오른쪽 캐릭터 이동
+        if(gameState.characterSprites['right_0']) {
+            gameState.characterSprites['right_0'].x = 780;
+        }
     }
     
-    // 오른쪽 캐릭터
-    for(let i = 0; i < charsPerSide; i++) {
-        const randomIndex = Phaser.Math.Between(0, availableChars.length - 1);
-        const char = availableChars.splice(randomIndex, 1)[0];
-        gameState.rightCharacters.push(char);
+    // 이미 배치된 캐릭터 수 확인
+    const leftCount = gameState.leftCharacters.length;
+    const rightCount = gameState.rightCharacters.length;
+    
+    // 왼쪽에 추가 캐릭터가 필요한 경우
+    if(leftCount < charsPerSide && gameState.availableChars.length > 0) {
+        const randomIndex = Phaser.Math.Between(0, gameState.availableChars.length - 1);
+        const char = gameState.availableChars.splice(randomIndex, 1)[0];
         
-        const xPos = charsPerSide === 1 ? 880 : 780 + i * 180;
+        const xPos = charsPerSide === 1 ? 200 : 280;
         const sprite = this.add.sprite(xPos, 1080, `${char}`).play(`${char}_normal`);
+        if(gameState.isFever)
+            sprite.play(`${char}_joy`);
         sprite.setScale(1.5);
-        sprite.setFlipX(true);
-        gameState.characterSprites[`right_${i}`] = sprite;
-    }    
+        gameState.characterSprites[`left_${leftCount}`] = sprite;
+        gameState.leftCharacters.push(char);
+    }
+    
+    // 오른쪽에 추가 캐릭터가 필요한 경우
+    if(rightCount < charsPerSide && gameState.availableChars.length > 0) {
+        const randomIndex = Phaser.Math.Between(0, gameState.availableChars.length - 1);
+        const char = gameState.availableChars.splice(randomIndex, 1)[0];
+        
+        const xPos = charsPerSide === 1 ? 880 : 960;
+        const sprite = this.add.sprite(xPos, 1080, `${char}`).play(`${char}_normal`);
+        if(gameState.isFever)
+            sprite.play(`${char}_joy`);
+        sprite.setScale(1.5);
+        gameState.characterSprites[`right_${rightCount}`] = sprite;
+        gameState.rightCharacters.push(char);
+    }
 }
 
 // 음식 큐 초기화
@@ -413,13 +398,19 @@ function sortFood(direction) {
     
     if(isCorrect) {
         // 정답
-        this.sound.play('good');
-        gameState.score += gameState.isFever ? 30 : 10;
+        this.sound.play('good', {volume: 0.5});
+        gameState.score += gameState.isFever ? 100 : 50;
         gameState.combo++;
         gameState.feverCount++;
+        gameState.timeLeft += 0.1;
         
         // 캐릭터 표정 변경
-        showCharacterEmotion.call(this, direction, currentFood, 'happy');
+        if(gameState.isFever) {
+            // 피버 모드: 이미 joy 재생 중이므로 아무것도 안 함
+        } else {
+            // 일반 모드: 해당 음식의 당사자만 happy
+            showCharacterEmotionByFood.call(this, direction, currentFood, 'happy');
+        }
         
         // Fever 모드 진입 확인
         if(!gameState.isFever && gameState.feverCount >= 10) {
@@ -428,18 +419,19 @@ function sortFood(direction) {
         
     } else {
         // 오답
-        this.sound.play('bad');
+        this.sound.play('bad', {volume: 0.5});
         gameState.combo = 0;
         gameState.feverCount = 0;
         gameState.timeLeft -= 5;
-        updateTimer.call(this);
-        
-        if(gameState.isFever) {
-            exitFeverMode.call(this);
-        }
         
         // 캐릭터 표정 변경
-        showCharacterEmotion.call(this, direction, currentFood, 'sad');
+        if(gameState.isFever) {
+            // 피버 모드 종료 (이때만 표정이 바뀜)
+            exitFeverMode.call(this);
+        } else {
+            // 일반 모드: 잘못 받은 테이블의 사람들만 sad
+            showCharacterEmotionByDirection.call(this, direction, 'sad');
+        }
     }
     
     // 음식 제거 및 추가
@@ -459,7 +451,7 @@ function sortFood(direction) {
 }
 
 // 캐릭터 표정 표시
-function showCharacterEmotion(direction, foodType, emotion) {
+function showCharacterEmotionByFood(direction, foodType, emotion) {
     const chars = direction === 'left' ? gameState.leftCharacters : gameState.rightCharacters;
     const charIndex = chars.indexOf(foodType);
     
@@ -470,12 +462,44 @@ function showCharacterEmotion(direction, foodType, emotion) {
         if(sprite) {
             sprite.play(`${foodType}_${emotion}`);
             
-            // 일정 시간 후 normal로 복귀
-            this.time.delayedCall(1000, () => {
-                if(sprite.active) {
+            // 일정 시간 후 normal로 복귀 (실행 시점에 상태 체크)
+            this.time.delayedCall(2000, () => {
+                // 피버 모드가 아니고, 스프라이트가 살아있을 때만 복귀
+                if(sprite.active && !gameState.isFever) {
                     sprite.play(`${foodType}_normal`);
                 }
             });
+        }
+    }
+}
+
+function showCharacterEmotionByDirection(direction, emotion) {
+    const chars = direction === 'left' ? gameState.leftCharacters : gameState.rightCharacters;
+    
+    for(let char of chars) {
+        const charIndex = chars.indexOf(char);
+        const spriteKey = `${direction}_${charIndex}`;
+        const sprite = gameState.characterSprites[spriteKey];
+        
+        if(sprite) {
+            const targetAnim = `${char}_${emotion}`;
+            
+            // 이미 해당 애니메이션이 재생 중이면 스킵
+            if(sprite.anims.currentAnim && sprite.anims.currentAnim.key === targetAnim) {
+                continue;
+            }
+            
+            sprite.play(targetAnim);
+
+            // normal이 아닌 경우에만 타이머 설정 (실행 시점에 상태 체크)
+            if(emotion !== 'normal') {
+                this.time.delayedCall(2000, () => {
+                    // 피버 모드가 아니고, 스프라이트가 살아있을 때만 복귀
+                    if(sprite.active && !gameState.isFever) {
+                        sprite.play(`${char}_normal`);
+                    }
+                });
+            }
         }
     }
 }
@@ -484,13 +508,19 @@ function showCharacterEmotion(direction, foodType, emotion) {
 function enterFeverMode() {
     gameState.isFever = true;
     gameState.feverTime = 15; // 15초
-    gameState.feverCount = 0;
     
     // 배경 변경
     gameState.background.setTexture('bg_fever');
+
+    // 테이블 변경
+    gameState.tables.setTexture('tables_fever');
     
     // BGM 변경
     gameState.bgm.setRate(160/120);
+    
+    // 모든 캐릭터 joy 표정으로 변경
+    showCharacterEmotionByDirection.call(this, 'left', 'joy');
+    showCharacterEmotionByDirection.call(this, 'right', 'joy');
     
     // Fever 타이머
     if(gameState.feverTimer) {
@@ -513,6 +543,9 @@ function exitFeverMode() {
     
     // 배경 복귀
     gameState.background.setTexture('bg_normal');
+
+    // 테이블 복귀
+    gameState.tables.setTexture('tables_normal');
     
     // BGM 복귀
     gameState.bgm.setRate(1);
@@ -522,6 +555,10 @@ function exitFeverMode() {
         gameState.feverTimer.remove();
         gameState.feverTimer = null;
     }
+
+    // 캐릭터 표정 normal로 복귀
+    showCharacterEmotionByDirection.call(this, 'left', 'normal');
+    showCharacterEmotionByDirection.call(this, 'right', 'normal');
 }
 
 // Fever 타이머 업데이트
@@ -542,83 +579,183 @@ function updateUI() {
     gameState.comboText.setText(gameState.combo.toString());
     
     // 피버 게이지 업데이트
-    const feverProgress = Math.min(gameState.feverCount / 10, 1);
-    gameState.fevergauge.setCrop(0, 408 - 408 * feverProgress, 924 / 3, 408);
+    const feverProgress = Math.min(Math.floor(gameState.feverCount / 2) * 0.2, 1);
+    gameState.fevergauge.setCrop(0, 0, 226 * feverProgress, 57);
 }
 
 // 게임 타이머 업데이트
 function updateTimer() {
-    gameState.timeLeft--;
+    gameState.timeLeft -= 0.01;
     gameState.timebar.setCrop(0, 0, 2892 / 3 * (gameState.timeLeft / 60), 72);
     
+    // 시간 종료
     if(gameState.timeLeft <= 0) {
+        gameState.timeLeft = 0; // 정확히 0으로 설정
         endGame.call(this);
     }
 }
 
 // 게임 종료
 function endGame() {
+    // 이미 종료 중이면 무시
+    if (gameState.showingEnding) return;
+    
+    gameState.showingEnding = true;
+    
     // 타이머 정지
     if(gameState.gameTimer) {
         gameState.gameTimer.remove();
+        gameState.gameTimer = null;
     }
     if(gameState.feverTimer) {
         gameState.feverTimer.remove();
+        gameState.feverTimer = null;
     }
     
     // BGM 정지
     gameState.bgm.stop();
-    this.sound.play('gameover');
+    this.sound.play('gameover', {volume: 0.5});
 
     showEnding.call(this);
 }
 
 // 엔딩 표시
-function showEnding() {
-    gameState.showingEnding = true;
-    
+function showEnding() {    
     // 모든 게임 오브젝트 숨기기
     this.children.list.forEach(child => {
         child.setVisible(false);
     });
     
-    // 엔딩 영상 재생
-    const endingVideo = this.add.video(540, 960, 'ending_mov');
-    endingVideo.play(false);
-    
-    // 영상이 끝나면 결과 화면 표시
-    endingVideo.on('complete', () => {
-        endingVideo.destroy();
-        showGameOverScreen.call(this);
-    });
+    showGameOverScreen.call(this);
 }
 
 // 게임 오버 화면 표시
 function showGameOverScreen() {
     this.add.image(540, 960, 'bg_fever');
     const bill = this.add.sprite(540, 960, 'bill').play('bill_default');
-    
-    const gameOverText = this.add.text(540, 800, 'GAME OVER', {
-        fontFamily: 'DNFBitBitv2',
-        fontSize: '72px',
-        fill: '#222222',
-    }).setOrigin(0.5);
-    
-    const finalScoreText = this.add.text(540, 920, `Final Score: ${gameState.score}`, {
-        fontFamily: 'DNFBitBitv2',
-        fontSize: '72px',
-        fill: '#222222',
-    }).setOrigin(0.5);
-    
-    const restartButton = this.add.text(540, 1100, 'RESTART', {
+        
+    // 리더보드 섹션
+    const leaderboardTitle = this.add.text(540, 450, `--------------------\n** RECEIPT **\n--------------------`, {
         fontFamily: 'DNFBitBitv2',
         fontSize: '48px',
-        fill: '#222222',
+        fill: gameState.fontColorDark,
+        align: 'center',
     }).setOrigin(0.5);
     
-    restartButton.setInteractive({ useHandCursor: true });
+    // 리더보드 컨테이너
+    const leaderboardContainer = this.add.container(540, 580);
+    gameState.leaderboardContainer = leaderboardContainer;
     
-    // 호버 효과
+    // 초기 로딩 메시지
+    const loadingText = this.add.text(0, 0, '점수 가져오는 중...', {
+        fontFamily: 'DNFBitBitv2',
+        fontSize: '48px',
+        fill: gameState.fontColorDark,
+    }).setOrigin(0.5);
+    leaderboardContainer.add(loadingText);
+    
+    // 리더보드 로드
+    loadLeaderboard.call(this);
+
+    // 최종 점수
+    const finalScoreText = this.add.text(540, 1300, `--------------------\n${gameState.score.toLocaleString()} \n\n\n--------------------`, {
+        fontFamily: 'DNFBitBitv2',
+        fontSize: '48px',
+        fill: gameState.fontColorDark,
+        align: 'right',
+    }).setOrigin(0.5);
+    
+    // 플레이어 이름 입력
+    let showCursor = true;
+    const nicknameInput = this.add.text(243, 1239, `닉네임 입력`, {
+        fontFamily: 'DNFBitBitv2',
+        fontSize: '48px',
+        fill: gameState.fontColorDark,
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+
+    const nicknameEvent = this.time.addEvent({
+        delay: 500,
+        loop: true,
+        callback: () => {
+            nicknameInput.setColor(showCursor ? gameState.fontColorDark : gameState.fontColorLight);
+            nicknameInput.setBackgroundColor(showCursor ? null : gameState.fontColorDark);
+
+            showCursor = !showCursor;
+        }
+    });
+
+    nicknameInput.on('pointerdown', async () => {
+        getNickname((nickname) => {
+            if(!nickname || nickname == '') {
+                nicknameInput.setText('닉네임 입력');
+            } else {
+                nickname = nickname.slice(0, 8);
+                localStorage.setItem("day6_wttd_nickname", nickname);
+                nicknameInput.setText(nickname);
+            }
+        });
+    });
+    
+    // 제출 버튼
+    const submitButton = this.add.text(540, 1350, '> 점수 등록하기 <', {
+        fontFamily: 'DNFBitBitv2',
+        fontSize: '48px',
+        fill: gameState.fontColorDark,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    
+    // 버튼 호버 효과
+    submitButton.on('pointerover', () => {
+        submitButton.setScale(1.1);
+    });
+    
+    submitButton.on('pointerout', () => {
+        submitButton.setScale(1);
+    });
+    
+    // 점수 제출
+    submitButton.on('pointerdown', async () => {
+        let nickname = localStorage.getItem("day6_wttd_nickname");
+        if (!nickname || nickname == '') {
+            const now = new Date();
+
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+
+            nickname = `마데_${hh}:${mm}`;
+            localStorage.setItem("day6_wttd_nickname", nickname);
+        }
+        
+        if (gameState.isSubmittingScore) return;
+        
+        gameState.isSubmittingScore = true;
+        submitButton.setText('점수 등록 중...');
+        submitButton.disableInteractive();
+        
+        const success = await submitScore(nickname, gameState.score);
+        
+        if (success) {
+            submitButton.destroy();
+            nicknameEvent.remove();
+            nicknameInput.setText(localStorage.getItem("day6_wttd_nickname"));
+            nicknameInput.disableInteractive();
+            nicknameInput.setColor(gameState.fontColorDark);
+            nicknameInput.setBackgroundColor(null);
+
+            await loadLeaderboard.call(this);
+        } else {
+            submitButton.setText('> 점수 등록하기 <');
+            submitButton.setInteractive({ useHandCursor: true });
+            gameState.isSubmittingScore = false;
+        }
+    });
+    
+    // 재시작 버튼
+    const restartButton = this.add.text(540, 1500, '> 다시하기 <', {
+        fontFamily: 'DNFBitBitv2',
+        fontSize: '48px',
+        fill: gameState.fontColorDark,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    
     restartButton.on('pointerover', () => {
         restartButton.setScale(1.1);
     });
@@ -627,10 +764,17 @@ function showGameOverScreen() {
         restartButton.setScale(1);
     });
     
-    // 재시작
     restartButton.on('pointerdown', () => {
+        // HTML 요소 정리
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => input.parentElement?.remove());
         location.reload(true);
     });
+}
+
+function getNickname(callback) {
+  const nickname = prompt("닉네임을 입력해 주세요. (8자 이하)\n캐시로 인해 최신 점수판이 바로 조회되지 않을 수 있습니다.");
+  callback(nickname); // 입력된 값을 인자로 콜백 호출
 }
 
 // 업데이트
@@ -647,4 +791,142 @@ function update() {
             sortFood.call(this, 'right');
         }
     }
+}
+
+// ============== 리더보드 API 함수들 ==============
+
+// 점수 제출
+async function submitScore(nickname, score) {
+    try {
+        const body = new URLSearchParams({
+            [API_CONFIG.ENTRY_NICK]: nickname,
+            [API_CONFIG.ENTRY_SCORE]: score
+        });
+        
+        await fetch(API_CONFIG.FORM_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: body
+        });
+        
+        return true;
+    } catch (error) {
+        console.error('점수 제출 실패:', error);
+        alert('점수 제출에 실패했습니다. 다시 시도해 주세요.');
+        return false;
+    }
+}
+
+// 리더보드 로드
+async function loadLeaderboard() {
+    if (!gameState.leaderboardContainer) return;
+    
+    gameState.leaderboardContainer.removeAll(true);
+    
+    const loadingText = this.add.text(0, 0, '점수 가져오는 중...', {
+        fontFamily: 'DNFBitBitv2',
+        fontSize: '48px',
+        fill: gameState.fontColorDark,
+    }).setOrigin(0.5);
+    gameState.leaderboardContainer.add(loadingText);
+    
+    try {
+        // 캐시 무효화 (헤더 없이)
+        const cacheBuster = `&_=${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const url = API_CONFIG.SHEET_URL + cacheBuster;
+        
+        // ✅ 헤더 제거, cache 옵션만 사용
+        const response = await fetch(url, {
+            cache: 'no-store'
+        });
+        
+        const csvText = await response.text();
+        
+        // 오늘 날짜 구하기
+        const today = new Date();
+        const todayString = `${today.getFullYear()}. ${today.getMonth() + 1}. ${today.getDate()}`;
+        
+        const rows = csvText.split('\n').slice(1);
+        const data = rows
+            .map(row => {
+                const columns = row.replace(/["\r]/g, '').split(',');
+                if (columns.length < 3) return null;
+                
+                const timestamp = columns[0];
+                
+                // 수정된 정규식: "오전/오후" 앞까지만 매칭
+                const dateMatch = timestamp.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+                
+                if (!dateMatch) {
+                    console.log('매칭 실패:', timestamp); // 디버깅용
+                    return null;
+                }
+                
+                const rowDate = `${dateMatch[1]}. ${parseInt(dateMatch[2])}. ${parseInt(dateMatch[3])}`;
+                                
+                // 오늘 날짜와 일치하는 데이터만 필터링
+                if (rowDate !== todayString) return null;
+                
+                return {
+                    nickname: columns[1],
+                    score: parseInt(columns[2]),
+                    timestamp: timestamp
+                };
+            })
+            .filter(item => item && !isNaN(item.score))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10);
+        
+        gameState.leaderboardData = data;
+        renderLeaderboard.call(this, data);
+        
+    } catch (error) {
+        console.error('점수판 로딩 실패:', error);
+        gameState.leaderboardContainer.removeAll(true);
+        const errorText = this.add.text(0, 0, '점수판 로딩 실패', {
+            fontFamily: 'DNFBitBitv2',
+            fontSize: '48px',
+            fill: gameState.fontColorDark,
+        }).setOrigin(0.5);
+        gameState.leaderboardContainer.add(errorText);
+    }
+}
+
+// 리더보드 렌더링
+function renderLeaderboard(data) {
+    if (!gameState.leaderboardContainer) return;
+    
+    gameState.leaderboardContainer.removeAll(true);
+    
+    if (data.length === 0) {
+        const emptyText = this.add.text(0, 0, '오늘은 아직 기록이 없어요!', {
+            fontFamily: 'DNFBitBitv2',
+            fontSize: '48px',
+            fill: gameState.fontColorDark,
+        }).setOrigin(0.5);
+        gameState.leaderboardContainer.add(emptyText);
+        return;
+    }
+    
+    // 리더보드 항목들 생성
+    data.forEach((item, index) => {
+        const yPos = index * 60; // 10개 항목을 세로로 배치
+        
+        // 닉네임
+        const nicknameText = this.add.text(-300, yPos, `${item.nickname}`, {
+            fontFamily: 'DNFBitBitv2',
+            fontSize: '48px',
+            fill: gameState.fontColorDark,
+        }).setOrigin(0, 0.5);
+                
+        // 점수
+        const scoreText = this.add.text(300, yPos, `${item.score.toLocaleString()}`, {
+            fontFamily: 'DNFBitBitv2',
+            fontSize: '48px',
+            fill: gameState.fontColorDark,
+            align: 'left',
+        }).setOrigin(1, 0.5);
+
+        gameState.leaderboardContainer.add([nicknameText, scoreText]);
+    });
 }
