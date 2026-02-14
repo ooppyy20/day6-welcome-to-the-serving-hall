@@ -1,9 +1,9 @@
 // API 설정 (구글 폼 및 시트 URL을 여기에 입력하세요)
 const API_CONFIG = {
-    FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSedkgqcVKUXZbW64qAon3xzAnMDeECvHScQO4yEEEgWltlIIQ/formResponse', // 구글 폼 제출 URL
-    SHEET_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS1t7Q4XpK2ISwW7yuy2R4GzDVvY9PaHaOW-yOAodVixvfPn14MUdsUYyg6INGxz-n5dh68HpCqzvr/pub?output=csv', // 구글 시트 CSV 내보내기 URL
-    ENTRY_NICK: 'entry.1963889324', // 구글 폼의 닉네임 필드 entry ID
-    ENTRY_SCORE: 'entry.1300941228' // 구글 폼의 점수 필드 entry ID
+    FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSexqmdlUqUesPdu5ojLo5_a-OT89DWJaJne4P7tnkFVARhKZw/formResponse', // 구글 폼 제출 URL
+    SHEET_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQv8aepACQKD9ZYmwCXz1iqoUqFGtN6XxgdqOOmEzNP0SgzjO5fbIDf16vGIcZ_-J4wJiw5Vusbs3gL/pub?output=csv', // 구글 시트 CSV 내보내기 URL
+    ENTRY_NICK: 'entry.1606980677', // 구글 폼의 닉네임 필드 entry ID
+    ENTRY_SCORE: 'entry.798425648' // 구글 폼의 점수 필드 entry ID
 };
 
 // 게임 설정
@@ -399,7 +399,7 @@ function sortFood(direction) {
     if(isCorrect) {
         // 정답
         this.sound.play('good', {volume: 0.3});
-        gameState.score += gameState.isFever ? 100 : 50;
+        gameState.score += gameState.isFever ? 30 : 10;
         gameState.combo++;
         gameState.feverCount++;
         gameState.timeLeft += 0.1;
@@ -443,10 +443,9 @@ function sortFood(direction) {
     updateFoodDisplay.call(this);
     
     // 난이도 증가 (점수에 따라)
-    if(gameState.score >= 2000 && gameState.difficulty === 1) {
+    if(gameState.score >= 1500 && gameState.difficulty === 1) {
         gameState.difficulty = 2;
         placeCharacters.call(this);
-        initializeFoodQueue.call(this);
     }
 }
 
